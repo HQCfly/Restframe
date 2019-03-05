@@ -2,9 +2,9 @@ from rest_framework import serializers
 
 from app01.models import *
 # 为queryset,model对象做序列化
-class PublishSerializers(serializers.Serializer):
-    name = serializers.CharField()
-    email = serializers.CharField()
+# class PublishSerializers(serializers.Serializer):
+#     name = serializers.CharField()
+#     email = serializers.CharField()
 
 
 class PublishModelSerializers(serializers.ModelSerializer):
@@ -71,3 +71,7 @@ class BookModelSerializers(serializers.ModelSerializer):
     #     book.authors.add(*validated_data["authors"])
     #
     #     return book
+class AuthorModelSerializers(serializers.ModelSerializer):
+    class Meta:
+        model = Author
+        fields = "__all__"

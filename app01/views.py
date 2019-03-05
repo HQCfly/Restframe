@@ -3,6 +3,8 @@ from django.shortcuts import render,HttpResponse
 # Create your views here.
 
 from django.views import View
+from rest_framework.pagination import PageNumberPagination,LimitOffsetPagination
+from rest_framework.parsers import JSONParser, FormParser
 from rest_framework.response import Response
 from .models import *
 
@@ -85,10 +87,24 @@ class PublishDetailView(APIView):
         return Response()
 
 
+class MyPageNumberPagination(PageNumberPagination):
+    page_size = 1
+    page_query_param = 'page'
+    page_size_query_param = 'size'
+    max_page_size = 2
+class MyLimitOffsetPagination(LimitOffsetPagination):
+    default_limit=1
+
 class BookView(APIView):
+
+    parser_classes = [JSONParser,FormParser]
     def get(self,request):
         book_list=Book.objects.all()
-        bs=BookModelSerializers(book_list,many=True,context={'request': request})
+        #分页
+        pnp = MyLimitOffsetPagination()
+        book_page = pnp.paginate_queryset(book_list,request,self)
+
+        bs=BookModelSerializers(book_page,many=True,context={'request': request})
         return Response(bs.data)
     def post(self,request):
         # post请求的数据
@@ -121,3 +137,44 @@ class BookDetailView(APIView):
         Book.objects.filter(pk=id).delete()
 
         return Response()
+from rest_framework import viewsets
+
+from app01.utils import TokenAuth,SVIPPermission,VisitRateThrottle
+
+
+
+class AuthorModelView(viewsets.ModelViewSet):
+    authentication_classes = [TokenAuth,]
+    permission_classes = [SVIPPermission]
+    throttle_classes = [VisitRateThrottle]
+    serializer_class = AuthorModelSerializers
+    pagination_class = MyPageNumberPagination
+
+def get_random_str(user):
+    import hashlib,time
+    ctime = str(time.time())
+    md5 = hashlib.md5(bytes(user,encoding="utf8"))
+    md5.update(bytes(ctime,encoding="utf8"))
+
+    return md5.hexdigest()
+
+from .models import User
+class LoginView(APIView):
+    def post(self,request):
+        name = request.data.get("name")
+        pwd = request.data.get("pwd")
+        user = User.objects.filter(name=name, pwd=pwd).first()
+        res = {"state_code": 1000, "msg": None}
+        if user:
+
+            random_str = get_random_str(user.name)
+            token = Token.objects.update_or_create(user=user, defaults={"token": random_str})
+            res["token"] = random_str
+        else:
+            res["state_code"] = 1001  # 错误状态码
+            res["msg"] = "用户名或者密码错误"
+
+        import json
+        return Response(json.dumps(res, ensure_ascii=False))
+
+
